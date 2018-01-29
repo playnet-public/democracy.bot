@@ -1,0 +1,12 @@
+FROM alpine:3.6
+
+LABEL maintainer "PlayNet <contact@play-net.org>"
+LABEL type "public"
+LABEL versioning "simple"
+
+ARG TOOL
+
+ADD ./build/ /
+
+RUN ln -s ./${TOOL} executable
+ENTRYPOINT ["./executable"]
