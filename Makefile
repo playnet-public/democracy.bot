@@ -39,6 +39,7 @@ include helpers/make_version
 include helpers/make_gohelpers
 include helpers/make_dockerbuild
 
+include .env
 
 ### MAIN STEPS ###
 
