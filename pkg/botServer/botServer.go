@@ -84,7 +84,7 @@ func (b *BotServer) getSessionOrAbort(w http.ResponseWriter, r *http.Request) *s
 	session, err := b.store.Get(r, "session")
 
 	if session == nil {
-		b.log.Error("unable to create session", zap.Error(err))
+		b.Log.Error("unable to create session", zap.Error(err))
 		http.Error(w, "invalid or corrupted session", http.StatusInternalServerError)
 		return nil
 	}
@@ -120,21 +120,21 @@ func (b *BotServer) handleCallback(w http.ResponseWriter, r *http.Request) {
 	// Check the state string is correct
 	state := r.FormValue("state")
 	if state != session.Values["state"] {
-		b.log.Error("invalid oauth session state", zap.String("state", state))
+		b.Log.Error("invalid oauth session state", zap.String("state", state))
 		http.Redirect(w, r, "/?key_to_success=0", http.StatusTemporaryRedirect)
 		return
 	}
 
 	errorMsg := r.FormValue("error")
 	if errorMsg != "" {
-		b.log.Error("received oauth error from provider", zap.String("error", errorMsg))
+		b.Log.Error("received oauth error from provider", zap.String("error", errorMsg))
 		http.Redirect(w, r, "/?key_to_success=0", http.StatusTemporaryRedirect)
 		return
 	}
 
 	token, err := b.oauthConf.Exchange(oauth2.NoContext, r.FormValue("code"))
 	if err != nil {
-		b.log.Error("failed to exchange token with provider", zap.String("error", errorMsg))
+		b.Log.Error("failed to exchange token with provider", zap.String("error", errorMsg))
 		http.Redirect(w, r, "/?key_to_success=0", http.StatusTemporaryRedirect)
 		return
 	}
@@ -142,7 +142,7 @@ func (b *BotServer) handleCallback(w http.ResponseWriter, r *http.Request) {
 	body, _ := json.Marshal(map[interface{}]interface{}{})
 	req, err := http.NewRequest("GET", b.apiBaseURL+"/users/@me", bytes.NewBuffer(body))
 	if err != nil {
-		b.log.Error("failed to create @me request", zap.Error(err))
+		b.Log.Error("failed to create @me request", zap.Error(err))
 		http.Error(w, "failed to retrieve user profile", http.StatusInternalServerError)
 		return
 	}
@@ -151,14 +151,14 @@ func (b *BotServer) handleCallback(w http.ResponseWriter, r *http.Request) {
 	client := &http.Client{Timeout: (20 * time.Second)}
 	resp, err := client.Do(req)
 	if err != nil {
-		b.log.Error("failed to request @me data", zap.Error(err))
+		b.Log.Error("failed to request @me data", zap.Error(err))
 		http.Error(w, "Failed to retrieve user profile", http.StatusInternalServerError)
 		return
 	}
 
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		b.log.Error("failed to read data from http response", zap.Error(err))
+		b.Log.Error("failed to read data from http response", zap.Error(err))
 		http.Error(w, "failed to retrieve user profile", http.StatusInternalServerError)
 		return
 	}
@@ -166,7 +166,7 @@ func (b *BotServer) handleCallback(w http.ResponseWriter, r *http.Request) {
 	user := discordgo.User{}
 	err = json.Unmarshal(respBody, &user)
 	if err != nil {
-		b.log.Error("failed to parse JSON payload from HTTP response", zap.Error(err))
+		b.Log.Error("failed to parse JSON payload from HTTP response", zap.Error(err))
 		http.Error(w, "failed to retrieve user profile", http.StatusInternalServerError)
 		return
 	}
@@ -211,11 +211,11 @@ func (b *BotServer) Run() {
 	server.HandleFunc("/login", b.handleLogin)
 	server.HandleFunc("/callback", b.handleCallback)
 
-	b.log.Info("starting server", zap.String("port", b.port))
+	b.Log.Info("starting server", zap.String("port", b.port))
 
 	err := http.ListenAndServe(fmt.Sprintf(":%s", b.port), server)
 	if err != nil {
-		b.log.Error("failed serving", zap.Error(err))
+		b.Log.Error("failed serving", zap.Error(err))
 	}
 }
 
