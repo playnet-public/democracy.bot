@@ -162,7 +162,7 @@ func (b *bot) messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	s.State.MaxMessageCount = 100
 
 	if strings.HasPrefix(m.Content, "!democracy") {
-		msg := strings.TrimPrefix(m.Content, "!democracy ")
+		m.Content = strings.TrimPrefix(m.Content, "!democracy ")
 		b.log.Info("handling message", zap.String("channel", m.ChannelID), zap.String("msg", m.Content))
 
 		c, err := s.State.Channel(m.ChannelID)
@@ -184,92 +184,40 @@ func (b *bot) messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			}
 		}
 
-		if msg == "init" {
+		if m.Content == "init" {
 			b.init(s, m, c)
-		}
-		if strings.HasPrefix(msg, "vote") {
-			msg = strings.TrimPrefix(msg, "vote ")
-			vote := strings.Split(msg, "|")
-			if len(vote) < 2 {
-				b.log.Error("invalid vote", zap.String("msg", msg))
-				uc, err := s.UserChannelCreate(m.Author.ID)
-				if err != nil {
-					b.log.Error("failed to create user channel", zap.String("user", m.Author.ID), zap.Error(err))
-					return
-				}
-				s.ChannelMessageSend(uc.ID, "invalid vote text. please follow this schema: '!democracy vote [title]|[text]'")
-				if err != nil {
-					b.log.Error("failed to send user message", zap.String("channel", uc.ID), zap.Error(err))
-					return
-				}
-				return
-			}
-			embed := &discordgo.MessageEmbed{
-				Title: fmt.Sprintf("[Vote] %s", vote[0]),
-				Author: &discordgo.MessageEmbedAuthor{
-					Name:    m.Author.Username,
-					IconURL: m.Author.AvatarURL("100x100"),
-				},
-				Color:       0x587987,
-				Description: vote[1],
-				Timestamp:   time.Now().UTC().Format(time.RFC3339),
-				Fields: []*discordgo.MessageEmbedField{
-					&discordgo.MessageEmbedField{
-						Name:   "Due Date",
-						Value:  fmt.Sprintf("%s", time.Now().AddDate(0, 0, 3).UTC().Format("02-01-2006 - 15:04:05")),
-						Inline: false,
-					},
-					&discordgo.MessageEmbedField{
-						Name:   "Pro",
-						Value:  ":white_check_mark:",
-						Inline: true,
-					},
-					&discordgo.MessageEmbedField{
-						Name:   "Con",
-						Value:  ":negative_squared_cross_mark:",
-						Inline: true,
-					},
-				},
-			}
-
-			voteEmbed, err := s.ChannelMessageSendEmbed(b.demoChan.ID, embed)
-			if err != nil {
-				b.log.Error("unable to send embed", zap.Error(err))
-				return
-			}
-			err = s.MessageReactionAdd(b.demoChan.ID, voteEmbed.ID, "✅")
-			if err != nil {
-				b.log.Error("unable to add emoji", zap.Error(err))
-				s.ChannelMessageDelete(b.demoChan.ID, voteEmbed.ID)
-				return
-			}
-			err = s.MessageReactionAdd(b.demoChan.ID, voteEmbed.ID, "❎")
-			if err != nil {
-				b.log.Error("unable to add emoji", zap.Error(err))
-				s.ChannelMessageDelete(b.demoChan.ID, voteEmbed.ID)
-				return
-			}
-
 			s.ChannelMessageDelete(c.ID, m.ID)
-			feedbackEmded, err := s.ChannelMessageSendEmbed(c.ID, &discordgo.MessageEmbed{
-				Title:       "Vote created",
-				Description: "Press :leftwards_arrow_with_hook: to Undo",
+		}
+
+		if strings.HasPrefix(m.Content, "vote") {
+			err = b.vote(s, m, c)
+			s.ChannelMessageDelete(c.ID, m.ID)
+			var feedbackEmbed *discordgo.Message
+			if err == nil {
+				feedbackEmbed, err = s.ChannelMessageSendEmbed(c.ID, &discordgo.MessageEmbed{
+					Title:       "Vote created",
+					Description: "Press :leftwards_arrow_with_hook: to Undo",
+				})
+				err = s.MessageReactionAdd(c.ID, feedbackEmbed.ID, "↩")
+				if err != nil {
+					b.log.Error("unable to add emoji", zap.Error(err))
+					s.ChannelMessageDelete(c.ID, feedbackEmbed.ID)
+				}
+				return
+			}
+
+			b.log.Error("unable to send embed", zap.Error(err))
+			feedbackEmbed, err = s.ChannelMessageSendEmbed(c.ID, &discordgo.MessageEmbed{
+				Title:       "Vote failed",
+				Description: fmt.Sprintf("Error: %s", err.Error()),
 			})
-			if err != nil {
-				b.log.Error("unable to send embed", zap.Error(err))
-				return
-			}
-			err = s.MessageReactionAdd(c.ID, feedbackEmded.ID, "↩")
-			if err != nil {
-				b.log.Error("unable to add emoji", zap.Error(err))
-				s.ChannelMessageDelete(c.ID, feedbackEmded.ID)
-				return
-			}
+			return
+
 		}
 	}
 }
 
-func (b *bot) init(s *discordgo.Session, m *discordgo.MessageCreate, c *discordgo.Channel) {
+func (b *bot) init(s *discordgo.Session, m *discordgo.MessageCreate, c *discordgo.Channel) bool {
 	b.log.Info("running init")
 
 	guild, err := s.Guild(c.GuildID)
@@ -280,14 +228,14 @@ func (b *bot) init(s *discordgo.Session, m *discordgo.MessageCreate, c *discordg
 			_, err := s.ChannelDelete(c.ID)
 			if err != nil {
 				b.log.Error("could not delete channel", zap.String("cid", c.ID), zap.Error(err))
-				return
+				return false
 			}
 		}
 	}
 	b.demoChan, err = s.GuildChannelCreate(guild.ID, "democracy", "text")
 	if err != nil {
 		b.log.Error("could not create channel")
-		return
+		return false
 	}
 	_, err = s.ChannelEditComplex(b.demoChan.ID, &discordgo.ChannelEdit{
 		Name:                 "democracy",
@@ -298,7 +246,7 @@ func (b *bot) init(s *discordgo.Session, m *discordgo.MessageCreate, c *discordg
 	})
 	if err != nil {
 		b.log.Error("could not update channel")
-		return
+		return false
 	}
 
 	embed := &discordgo.MessageEmbed{
@@ -348,9 +296,64 @@ func (b *bot) init(s *discordgo.Session, m *discordgo.MessageCreate, c *discordg
 	_, err = s.ChannelMessageSendEmbed(b.demoChan.ID, embed)
 	if err != nil {
 		b.log.Error("unable to send embed", zap.Error(err))
-		return
+		return false
 	}
-	s.ChannelMessageDelete(c.ID, m.ID)
+	return true
+}
+
+func (b *bot) vote(s *discordgo.Session, m *discordgo.MessageCreate, c *discordgo.Channel) error {
+	m.Content = strings.TrimPrefix(m.Content, "vote ")
+	vote := strings.Split(m.Content, "|")
+	if len(vote) < 2 {
+		b.log.Error("invalid vote", zap.String("msg", m.Content))
+		return errors.New("Invalid vote text. Please follow this schema: '!democracy vote [title]|[text]'")
+	}
+	embed := &discordgo.MessageEmbed{
+		Title: fmt.Sprintf("[Vote] %s", vote[0]),
+		Author: &discordgo.MessageEmbedAuthor{
+			Name:    m.Author.Username,
+			IconURL: m.Author.AvatarURL("100x100"),
+		},
+		Color:       0x587987,
+		Description: vote[1],
+		Timestamp:   time.Now().UTC().Format(time.RFC3339),
+		Fields: []*discordgo.MessageEmbedField{
+			&discordgo.MessageEmbedField{
+				Name:   "Due Date",
+				Value:  fmt.Sprintf("%s", time.Now().AddDate(0, 0, 3).UTC().Format("02-01-2006 - 15:04:05")),
+				Inline: false,
+			},
+			&discordgo.MessageEmbedField{
+				Name:   "Pro",
+				Value:  ":white_check_mark:",
+				Inline: true,
+			},
+			&discordgo.MessageEmbedField{
+				Name:   "Con",
+				Value:  ":negative_squared_cross_mark:",
+				Inline: true,
+			},
+		},
+	}
+
+	voteEmbed, err := s.ChannelMessageSendEmbed(b.demoChan.ID, embed)
+	if err != nil {
+		b.log.Error("unable to send embed", zap.Error(err))
+		return err
+	}
+	err = s.MessageReactionAdd(b.demoChan.ID, voteEmbed.ID, "✅")
+	if err != nil {
+		b.log.Error("unable to add emoji", zap.Error(err))
+		s.ChannelMessageDelete(b.demoChan.ID, voteEmbed.ID)
+		return err
+	}
+	err = s.MessageReactionAdd(b.demoChan.ID, voteEmbed.ID, "❎")
+	if err != nil {
+		b.log.Error("unable to add emoji", zap.Error(err))
+		s.ChannelMessageDelete(b.demoChan.ID, voteEmbed.ID)
+		return err
+	}
+	return nil
 }
 
 //TODO: Move this to playnet common libs
