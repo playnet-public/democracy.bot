@@ -65,9 +65,31 @@ func (v *VoteHandler) React(c *discordgo.Channel, s *discordgo.Session, m *disco
 		edit.Embed = vote.Embed(s)
 		_, err = s.ChannelMessageEditComplex(edit)
 		if err != nil {
-			v.log.Error("unable to update vote", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("user", m.UserID), zap.Error(err))
+			v.log.Error("unable to update vote", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("channel", c.ID), zap.String("user", m.UserID), zap.Error(err))
 			return
 		}
+		err = s.MessageReactionRemove(c.ID, m.MessageID, m.Emoji.Name, m.UserID)
+		if err != nil {
+			v.log.Error("unable to remove reaction", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("channel", c.ID), zap.String("message", m.MessageID), zap.String("emoji", m.Emoji.Name), zap.String("user", m.UserID), zap.Error(err))
+			return
+		}
+		/*err = s.MessageReactionsRemoveAll(editMsg.ChannelID, editMsg.ID)
+		if err != nil {
+			v.log.Error("unable to remove reaction", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("channel", c.ID), zap.String("user", m.UserID), zap.Error(err))
+			return
+		}
+		err = s.MessageReactionAdd(editMsg.ChannelID, editMsg.ID, "✅")
+		if err != nil {
+			s.ChannelMessageDelete(editMsg.ChannelID, editMsg.ID)
+			v.log.Error("unable to add emoji", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.Error(err))
+			return
+		}
+		err = s.MessageReactionAdd(editMsg.ChannelID, editMsg.ID, "❎")
+		if err != nil {
+			s.ChannelMessageDelete(editMsg.ChannelID, editMsg.ID)
+			v.log.Error("unable to add emoji", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.Error(err))
+			return
+		}*/
 	}
 	if m.Emoji.Name == "❎" {
 		v.log.Info("updating vote", zap.String("guild", c.GuildID), zap.String("vote", m.MessageID), zap.String("user", m.UserID))
@@ -90,8 +112,30 @@ func (v *VoteHandler) React(c *discordgo.Channel, s *discordgo.Session, m *disco
 		edit.Embed = vote.Embed(s)
 		_, err = s.ChannelMessageEditComplex(edit)
 		if err != nil {
-			v.log.Error("unable to update vote", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("user", m.UserID), zap.Error(err))
+			v.log.Error("unable to update vote", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("channel", c.ID), zap.String("user", m.UserID), zap.Error(err))
 			return
 		}
+		err = s.MessageReactionRemove(c.ID, m.MessageID, m.Emoji.Name, m.UserID)
+		if err != nil {
+			v.log.Error("unable to remove reaction", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("channel", c.ID), zap.String("message", m.MessageID), zap.String("emoji", m.Emoji.Name), zap.String("user", m.UserID), zap.Error(err))
+			return
+		}
+		/*err = s.MessageReactionsRemoveAll(editMsg.ChannelID, editMsg.ID)
+		if err != nil {
+			v.log.Error("unable to remove reaction", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("channel", c.ID), zap.String("user", m.UserID), zap.Error(err))
+			return
+		}
+		err = s.MessageReactionAdd(editMsg.ChannelID, editMsg.ID, "✅")
+		if err != nil {
+			s.ChannelMessageDelete(editMsg.ChannelID, editMsg.ID)
+			v.log.Error("unable to add emoji", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.Error(err))
+			return
+		}
+		err = s.MessageReactionAdd(editMsg.ChannelID, editMsg.ID, "❎")
+		if err != nil {
+			s.ChannelMessageDelete(editMsg.ChannelID, editMsg.ID)
+			v.log.Error("unable to add emoji", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.Error(err))
+			return
+		}*/
 	}
 }

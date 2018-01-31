@@ -39,7 +39,7 @@ func (v *Vote) Embed(s *discordgo.Session) *discordgo.MessageEmbed {
 			fmt.Sprintf("%s", v.Expires.UTC().Format("02-01-2006 - 15:04:05")),
 			false,
 		).
-		AddField("Pro", fmt.Sprintf(":white_check_mark: - %d", v.Pro), true).
-		AddField("Con", fmt.Sprintf(":negative_squared_cross_mark: - %d", v.Con), true)
+		AddField("Pro", fmt.Sprintf(":white_check_mark: [ %d ]", v.Pro), true).
+		AddField("Con", fmt.Sprintf(":negative_squared_cross_mark: [ %d ]", v.Con), true)
 	return embed.MessageEmbed
 }
