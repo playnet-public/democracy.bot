@@ -56,6 +56,15 @@ func (b *Bot) MessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return
 	}
+	if m.Content == "!democracy" {
+		s.ChannelMessageDelete(m.ChannelID, m.ID)
+		_, err := s.ChannelMessageSendEmbed(m.ChannelID, newInitEmbed())
+		if err != nil {
+			b.Log.Error("unable to send embed", zap.Error(err))
+			return
+		}
+		return
+	}
 	if !strings.HasPrefix(m.Content, "!democracy ") {
 		return
 	}
@@ -250,6 +259,11 @@ func newInitEmbed() *discordgo.MessageEmbed {
 			&discordgo.MessageEmbedField{
 				Name:   "Start Vote",
 				Value:  "!democracy vote [title]|[text]",
+				Inline: true,
+			},
+			&discordgo.MessageEmbedField{
+				Name:   "Show this Text",
+				Value:  "!democracy",
 				Inline: true,
 			},
 			//&discordgo.MessageEmbedField{
