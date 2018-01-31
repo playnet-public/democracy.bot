@@ -36,6 +36,11 @@ var (
 	clientID     = flag.String("clientID", "", "oauth client id")
 	clientSecret = flag.String("clientSecret", "", "oauth client secret")
 
+	dbHost     = flag.String("dbHost", "localhost", "db server host")
+	dbUser     = flag.String("dbUser", "db", "db user")
+	dbName     = flag.String("dbName", "db", "db name")
+	dbPassword = flag.String("dbPassword", "dev", "db password")
+
 	sentry *raven.Client
 )
 
@@ -119,19 +124,13 @@ func do(log *zap.Logger) error {
 	}
 
 	voteHandler := votes.NewVoteHandler(log)
+	err = voteHandler.InitDB(*dbHost, *dbName, *dbUser, *dbPassword)
 	bot := votes.New(log)
 
-	bot.AddMessageHandler("reset", func(c *discordgo.Channel, s *discordgo.Session, m *discordgo.MessageCreate) {
-		g, err := s.Guild(c.GuildID)
-		if err != nil {
-			bot.Log.Error("could not fetch democracy channel", zap.String("guild", c.GuildID), zap.Error(err))
-			return
-		}
-		bot.ResetDemocracy(s, g)
-	})
-
+	bot.AddMessageHandler("reset", bot.ResetDemocracy)
 	bot.AddMessageHandler("vote", voteHandler.Vote)
 	bot.AddReactionHandler("Vote created", voteHandler.React)
+	bot.AddReactionHandler("[Vote]", voteHandler.React)
 
 	log.Info("adding handlers")
 	discord.AddHandler(bot.Ready)

@@ -1,7 +1,9 @@
 package votes
 
 import (
+	"database/sql"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/playnet-public/democracy.bot/pkg/helpers"
@@ -13,6 +15,7 @@ import (
 // VoteHandler for primitive votes
 type VoteHandler struct {
 	log *zap.Logger
+	db  *sql.DB
 }
 
 // NewVoteHandler for channel
@@ -22,8 +25,55 @@ func NewVoteHandler(log *zap.Logger) *VoteHandler {
 	}
 }
 
+// ReloadVotes to channel
+func (v *VoteHandler) ReloadVotes(c *discordgo.Channel, s *discordgo.Session, m *discordgo.MessageCreate) {
+	v.log.Info("reloading votes", zap.String("guild", c.GuildID))
+	votes, err := v.ReadVotes(c.GuildID)
+	if err != nil {
+		v.log.Error("unable to read votes from db", zap.String("guild", c.GuildID), zap.String("msg", m.Content), zap.Error(err))
+		return
+	}
+	for _, vote := range votes {
+		vote, err := v.GetVoteCount(vote)
+		if err != nil {
+			v.log.Error("unable to get vote entries", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("msg", m.Content), zap.Error(err))
+			return
+		}
+		embed := vote.Embed(s)
+		voteEmbed, err := s.ChannelMessageSendEmbed(c.ID, embed)
+		if err != nil {
+			v.log.Error("unable to send embed", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("msg", m.Content), zap.Error(err))
+			return
+		}
+		err = s.MessageReactionAdd(c.ID, voteEmbed.ID, "✅")
+		if err != nil {
+			s.ChannelMessageDelete(c.ID, voteEmbed.ID)
+			v.log.Error("unable to add emoji", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("msg", m.Content), zap.Error(err))
+			return
+		}
+		err = s.MessageReactionAdd(c.ID, voteEmbed.ID, "❎")
+		if err != nil {
+			s.ChannelMessageDelete(c.ID, voteEmbed.ID)
+			v.log.Error("unable to add emoji", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("msg", m.Content), zap.Error(err))
+			return
+		}
+		vote.CurrentID = voteEmbed.ID
+		err = v.UpdateVote(vote.ID, vote)
+		if err != nil {
+			s.ChannelMessageDelete(c.ID, voteEmbed.ID)
+			v.log.Error("unable to update vote", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("msg", m.Content), zap.Error(err))
+			return
+		}
+	}
+}
+
 // Vote Message Handler
 func (v *VoteHandler) Vote(c *discordgo.Channel, s *discordgo.Session, m *discordgo.MessageCreate) {
+	if m.Content == "reset_handler" {
+		v.ReloadVotes(c, s, m)
+		return
+	}
+
 	var r result
 	r = newResult("failed creating vote", "unable to create vote")
 
@@ -50,6 +100,18 @@ func (v *VoteHandler) Vote(c *discordgo.Channel, s *discordgo.Session, m *discor
 		)
 		return
 	}
+	voteObj := Vote{
+		Guild:       c.GuildID,
+		ID:          voteEmbed.ID,
+		CurrentID:   voteEmbed.ID,
+		Title:       vote[0],
+		Description: vote[1],
+		Author:      m.Author.ID,
+		Created:     time.Now(),
+		Expires:     time.Now().AddDate(0, 0, 3),
+		Pro:         0,
+		Con:         0,
+	}
 	err = s.MessageReactionAdd(c.ID, voteEmbed.ID, "✅")
 	if err != nil {
 		s.ChannelMessageDelete(c.ID, voteEmbed.ID)
@@ -70,6 +132,16 @@ func (v *VoteHandler) Vote(c *discordgo.Channel, s *discordgo.Session, m *discor
 		)
 		return
 	}
+	err = v.InsertVote(voteObj)
+	if err != nil {
+		s.ChannelMessageDelete(c.ID, voteEmbed.ID)
+		r = newResult(
+			"unable to store vote",
+			"Failed to store vote in DB. Please contact support.",
+			err,
+		)
+		return
+	}
 	r = newResult("", voteEmbed.ID)
 }
 
@@ -78,7 +150,7 @@ func (v *VoteHandler) MessageCallback(s *discordgo.Session, m *discordgo.Message
 	var err error
 	if r.err != nil {
 		v.log.Error(r.err.Error(), zap.String("msg", m.Content), zap.Error(r.err))
-		err = newVoteSuccessEmbed(s, m.ChannelID, r.response, m.Author)
+		err = newVoteFailedEmbed(s, m.ChannelID, r.response, m.Author)
 	} else {
 		v.log.Info("vote success", zap.String("msg", m.Content))
 		err = newVoteSuccessEmbed(s, m.ChannelID, r.response, m.Author)

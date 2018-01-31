@@ -45,9 +45,9 @@ func (b *Bot) Ready(s *discordgo.Session, event *discordgo.Ready) {
 	s.State.TrackChannels = true
 	s.State.MaxMessageCount = 100
 
-	for _, g := range event.Guilds {
+	/*for _, g := range event.Guilds {
 		b.ResetDemocracy(s, g)
-	}
+	}*/
 
 }
 
@@ -105,7 +105,15 @@ func (b *Bot) ReactionAdd(s *discordgo.Session, m *discordgo.MessageReactionAdd)
 }
 
 // ResetDemocracy for the provied guild
-func (b *Bot) ResetDemocracy(s *discordgo.Session, g *discordgo.Guild) {
+func (b *Bot) ResetDemocracy(c *discordgo.Channel, s *discordgo.Session, m *discordgo.MessageCreate) {
+	if m.Content == "reset_handler" {
+		return
+	}
+	g, err := s.Guild(c.GuildID)
+	if err != nil {
+		b.Log.Error("could not fetch guild", zap.String("guild", c.GuildID), zap.Error(err))
+		return
+	}
 	errHandler := func(guild *discordgo.Guild, e string) {
 		owner, err := s.UserChannelCreate(guild.OwnerID)
 		if err != nil {
@@ -168,6 +176,12 @@ func (b *Bot) ResetDemocracy(s *discordgo.Session, g *discordgo.Guild) {
 		errHandler(g, "unable to send embed")
 		return
 	}
+
+	// Reload Handlers
+	for _, f := range b.messageHandlers {
+		m.Content = "reset_handler"
+		f(ch, s, m)
+	}
 }
 
 func (b *Bot) getChannel(s *discordgo.Session, current string) (ch *discordgo.Channel) {
@@ -193,6 +207,18 @@ func (b *Bot) getChannel(s *discordgo.Session, current string) (ch *discordgo.Ch
 	}
 	return ch
 }
+
+/*func (b *Bot) getGuildChannel(s *discordgo.Session, guild *discordgo.Guild) (ch *discordgo.Channel) {
+	for _, c := range guild.Channels {
+		if c.Name == "democracy" {
+			ch = c
+		}
+	}
+	if ch == nil {
+		b.Log.Error("democracy channel not found", zap.String("guild", guild.ID))
+	}
+	return ch
+}*/
 
 func newInitEmbed() *discordgo.MessageEmbed {
 	return &discordgo.MessageEmbed{

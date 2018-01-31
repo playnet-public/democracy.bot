@@ -1,0 +1,17 @@
+DB_IMAGE=bitnami/postgresql
+DB_VERSION=9.6
+DB_NAME=db
+
+start-db:
+	docker run \
+	--name $(NAME)-db \
+	--rm \
+	-v $(shell pwd)/db:/bitnami \
+	-e POSTGRESQL_PASSWORD=$(DB_PASSWORD) \
+	-e POSTGRESQL_DATABASE=$(DB_NAME) \
+	-e POSTGRESQL_USERNAME=$(DB_NAME) \
+	-p 5432:5432 \
+	$(DB_IMAGE):$(DB_VERSION)
+
+stop-db:
+	docker stop $(NAME)-db

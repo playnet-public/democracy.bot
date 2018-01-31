@@ -35,11 +35,12 @@ SINGLE_TOOL := $(words $(SUBDIRS))
 $(if $(findstring full,$(MAKECMDGOALS)), $(eval SINGLE_TOOL=2),)
 TARGETS ?= default
 
+include .env
+
 include helpers/make_version
 include helpers/make_gohelpers
 include helpers/make_dockerbuild
-
-include .env
+include helpers/make_db
 
 ### MAIN STEPS ###
 
