@@ -32,10 +32,10 @@
   revision = "23def4e6c14b4da8ac2ed8007337bc5eb5007998"
 
 [[projects]]
-  branch = "master"
   name = "github.com/golang/protobuf"
   packages = ["proto"]
   revision = "925541529c1fa6821df4e44ce2723319eb2be768"
+  version = "v1.0.0"
 
 [[projects]]
   name = "github.com/gorilla/context"
@@ -65,7 +65,16 @@
   branch = "master"
   name = "github.com/kolide/kit"
   packages = ["version"]
-  revision = "534ec31773367b97c60a3295296902ded9d91ec0"
+  revision = "d4b803f4eea66a463259243f2e95bad5124b7310"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/lib/pq"
+  packages = [
+    ".",
+    "oid"
+  ]
+  revision = "19c8e9ad00952ce0c64489b60e8df88bb16dd514"
 
 [[projects]]
   name = "github.com/pkg/errors"
@@ -143,6 +152,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "cfca0f0c43abe376122f5edb4d468af07c195253e9a9c01661a33d605e79e4be"
+  inputs-digest = "aff24528590bb112dea37a94a610cbf669be29afc169282e972b7878c48f47ca"
   solver-name = "gps-cdcl"
   solver-version = 1
