@@ -1,6 +1,8 @@
 package votes
 
 import (
+	"strings"
+
 	"github.com/bwmarrin/discordgo"
 	"go.uber.org/zap"
 )
@@ -18,18 +20,46 @@ func (v *VoteHandler) React(c *discordgo.Channel, s *discordgo.Session, m *disco
 			return
 		}
 		embed := msg.Embeds[0]
-		if embed.Author.Name != m.UserID {
-			v.log.Info("permission denied for undo", zap.String("expected", embed.Author.Name), zap.String("user", m.UserID))
-			return
-		}
+		isVote := false
 		if embed.Title != "Vote created" {
-			v.log.Info("not a vote create event")
-			return
+			if !strings.HasPrefix(embed.Title, "[Vote]") {
+				v.log.Info("not a vote create event")
+				return
+			}
+			isVote = true
 		}
 		voteID := embed.Description
-		err = s.ChannelMessageDelete(c.ID, voteID)
+		vote, err := v.GetVote(c.GuildID, voteID)
 		if err != nil {
-			v.log.Error("unable to delete vote", zap.Error(err))
+			vote, err = v.GetVote(c.GuildID, m.MessageID)
+			if err != nil {
+				v.log.Error("unable to fetch vote from db", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("user", m.UserID), zap.Error(err))
+				return
+			}
+		}
+		if vote.Author != m.UserID {
+			v.log.Info("permission denied for undo", zap.String("expected", vote.Author), zap.String("user", m.UserID))
+			return
+		}
+		err = v.DeleteVote(vote)
+		if err != nil {
+			v.log.Error("unable to delete vote from db", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("author", vote.Author), zap.Error(err))
+			return
+		}
+		err = s.ChannelMessageDelete(c.ID, vote.CurrentID)
+		if err != nil {
+			err = s.ChannelMessageDelete(c.ID, vote.ID)
+			if err != nil {
+				v.log.Error("unable to delete vote", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("author", vote.Author), zap.Error(err))
+				return
+			}
+		}
+		err = v.DeleteVoteEntries(vote)
+		if err != nil {
+			v.log.Error("unable to delete vote entries from db", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("author", vote.Author), zap.Error(err))
+			return
+		}
+		if isVote {
 			return
 		}
 		embed.Title = "Vote deleted"

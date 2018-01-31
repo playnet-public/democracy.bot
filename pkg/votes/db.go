@@ -143,7 +143,55 @@ func (v *VoteHandler) UpdateVote(id string, vote Vote) error {
 		v.log.Error("error getting affected rows", zap.String("guild", vote.Guild), zap.String("currentID", vote.CurrentID), zap.String("vote", vote.ID), zap.Error(err))
 		return err
 	}
-	v.log.Info("finished update", zap.Int64("affected", rowCnt))
+	v.log.Info("finished update", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("author", vote.Author), zap.Int64("affected", rowCnt))
+
+	return nil
+}
+
+// DeleteVote from guild
+func (v *VoteHandler) DeleteVote(vote Vote) error {
+	v.log.Info("deleting vote", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("author", vote.Author))
+	query := "DELETE FROM votes WHERE vote_id = $1 and guild_id = $2"
+	stmt, err := v.db.Prepare(query)
+	if err != nil {
+		v.log.Error("error preparing delete", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("author", vote.Author), zap.Error(err), zap.String("query", query))
+		return err
+	}
+	res, err := stmt.Exec(vote.ID, vote.Guild)
+	if err != nil {
+		v.log.Error("error executing delete", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("author", vote.Author), zap.Error(err))
+		return err
+	}
+	rowCnt, err := res.RowsAffected()
+	if err != nil {
+		v.log.Error("error getting affected rows", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("author", vote.Author), zap.Error(err))
+		return err
+	}
+	v.log.Info("finished delete vote", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("author", vote.Author), zap.Int64("affected", rowCnt))
+
+	return nil
+}
+
+// DeleteVoteEntries from guild
+func (v *VoteHandler) DeleteVoteEntries(vote Vote) error {
+	v.log.Info("deleting vote entries", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("author", vote.Author))
+	query := "DELETE FROM vote_entries WHERE vote_id = $1 and guild_id = $2"
+	stmt, err := v.db.Prepare(query)
+	if err != nil {
+		v.log.Error("error preparing delete", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("author", vote.Author), zap.Error(err), zap.String("query", query))
+		return err
+	}
+	res, err := stmt.Exec(vote.ID, vote.Guild)
+	if err != nil {
+		v.log.Error("error executing delete", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("author", vote.Author), zap.Error(err))
+		return err
+	}
+	rowCnt, err := res.RowsAffected()
+	if err != nil {
+		v.log.Error("error getting affected rows", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("author", vote.Author), zap.Error(err))
+		return err
+	}
+	v.log.Info("finished delete entries", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("author", vote.Author), zap.Int64("affected", rowCnt))
 
 	return nil
 }
