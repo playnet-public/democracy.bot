@@ -126,3 +126,8 @@ build-docker-bin:
 
 .build-all:
 	make full build
+
+update-deployment: docker upload clean restart-deployment
+
+restart-deployment:
+	kubectl delete po -n bot -lapp=democracy

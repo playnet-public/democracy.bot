@@ -15,6 +15,7 @@ import (
 
 // InitDB for persisting votes
 func (v *VoteHandler) InitDB(host, name, user, password string) error {
+	v.log.Info("connecting db", zap.String("host", host), zap.String("db", name))
 	db, err := sql.Open("postgres", fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=disable", user, password, host, name))
 	if err != nil {
 		v.log.Error("unable to open db", zap.String("host", host), zap.String("db", name), zap.String("user", user), zap.Error(err))
@@ -27,6 +28,7 @@ func (v *VoteHandler) InitDB(host, name, user, password string) error {
 
 // ReadVotes for guild
 func (v *VoteHandler) ReadVotes(guild string) ([]Vote, error) {
+	v.log.Info("fetching votes", zap.String("guild", guild))
 	vote := Vote{
 		Guild: guild,
 	}
@@ -61,6 +63,7 @@ func (v *VoteHandler) ReadVotes(guild string) ([]Vote, error) {
 
 // GetVote by (current) ID
 func (v *VoteHandler) GetVote(guild, id string) (Vote, error) {
+	v.log.Info("fetching vote", zap.String("guild", guild), zap.String("vote", id))
 	vote := Vote{
 		Guild: guild,
 	}
@@ -99,14 +102,14 @@ func (v *VoteHandler) GetVote(guild, id string) (Vote, error) {
 
 // InsertVote to guild
 func (v *VoteHandler) InsertVote(vote Vote) error {
-
-	query := "INSERT INTO votes(guild_id, vote_id, title, description, author, created, expiration) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)"
+	v.log.Info("inserting vote", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("author", vote.Author))
+	query := "INSERT INTO votes(guild_id, vote_id, current_id, title, description, author, created, expiration) VALUES($1,$2,$3,$4,$5,$6,$7,$8)"
 	stmt, err := v.db.Prepare(query)
 	if err != nil {
 		v.log.Error("error preparing insert", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.Error(err), zap.String("query", query))
 		return err
 	}
-	res, err := stmt.Exec(vote.Guild, vote.ID, vote.Title, vote.Description, vote.Author, vote.Created, vote.Expires)
+	res, err := stmt.Exec(vote.Guild, vote.ID, vote.ID, vote.Title, vote.Description, vote.Author, vote.Created, vote.Expires)
 	if err != nil {
 		v.log.Error("error executing insert", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.Error(err))
 		return err
@@ -116,13 +119,14 @@ func (v *VoteHandler) InsertVote(vote Vote) error {
 		v.log.Error("error getting affected rows", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.Error(err))
 		return err
 	}
-	v.log.Info("finished insert", zap.Int64("affected", rowCnt))
+	v.log.Info("finished insert", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("author", vote.Author), zap.Int64("affected", rowCnt))
 
 	return nil
 }
 
 // UpdateVote to guild
 func (v *VoteHandler) UpdateVote(id string, vote Vote) error {
+	v.log.Info("updating vote", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("author", vote.Author))
 	query := "UPDATE votes SET current_id = $2 WHERE vote_id = $1"
 	stmt, err := v.db.Prepare(query)
 	if err != nil {
@@ -146,6 +150,7 @@ func (v *VoteHandler) UpdateVote(id string, vote Vote) error {
 
 // GetVoteCount for vote
 func (v *VoteHandler) GetVoteCount(vote Vote) (Vote, error) {
+	v.log.Info("fetching vote entries", zap.String("guild", vote.Guild), zap.String("vote", vote.ID))
 	rows, err := v.db.Query("select author, vote from vote_entries where guild_id = $1 and vote_id = $2", vote.Guild, vote.ID)
 	if err != nil {
 		v.log.Error("error querying rows", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.Error(err))
@@ -182,6 +187,7 @@ func (v *VoteHandler) GetVoteCount(vote Vote) (Vote, error) {
 
 // AddVoteEntry for user
 func (v *VoteHandler) AddVoteEntry(vote Vote, author string, value bool) error {
+	v.log.Info("adding vote entry", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("author", author))
 	query := "INSERT INTO vote_entries(vote_id, guild_id, author, vote) VALUES($1,$2,$3,$4)"
 	stmt, err := v.db.Prepare(query)
 	if err != nil {
@@ -219,6 +225,7 @@ func (v *VoteHandler) AddVoteEntry(vote Vote, author string, value bool) error {
 
 // UpdateVoteEntry for user
 func (v *VoteHandler) UpdateVoteEntry(vote Vote, author string, value bool) error {
+	v.log.Info("updating vote entry", zap.String("guild", vote.Guild), zap.String("vote", vote.ID), zap.String("author", author))
 	query := "UPDATE vote_entries SET vote = $3 WHERE vote_id = $1 AND author = $2"
 	stmt, err := v.db.Prepare(query)
 	if err != nil {
