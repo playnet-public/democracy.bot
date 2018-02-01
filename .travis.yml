@@ -18,7 +18,5 @@ before_script:
 
 script:
 - make docker
-
-before_deploy:
 - docker login -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD" quay.io
 - make upload
