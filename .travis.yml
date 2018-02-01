@@ -1,5 +1,25 @@
 language: go
 
 go:
-  - 1.8
-  - 1.9
+  - 1.8.x
+  - 1.9.x
+
+go_import_path: github.com/playnet-public/fscrub
+
+env:
+  global:
+  - REPO: $TRAVIS_REPO_SLUG
+  - VERSION: $TRAVIS_TAG
+
+before_install:
+  - make deps
+
+before_script:
+  - make test
+
+script:
+- make docker
+
+before_deploy:
+- docker login -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD" quay.io
+- make upload
